@@ -1,8 +1,13 @@
 import json
 import time
 from collections.abc import Iterator
+from queue import Empty, Queue
+from threading import Thread
+
+from fastapi import HTTPException
 
 from app.agents.crew_manager import ComplianceCrewManager
+from app.models.llm_config import LLMConfigurationError, LLMGenerationError
 from app.models.openai_models import AgentTrace, AnalyticsEvent, ComplianceAnswer, PolicyQueryRequest
 from app.rag.citation_builder import build_citations
 from app.services.retrieval_service import retrieval_service
@@ -16,7 +21,12 @@ class ResponseService:
     def answer(self, request: PolicyQueryRequest) -> ComplianceAnswer:
         started = time.perf_counter()
         chunks = retrieval_service.retrieve(request.question, request.filters, request.top_k)
-        result = self.crew.run(request, chunks)
+        try:
+            result = self.crew.run(request, chunks)
+        except LLMConfigurationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except LLMGenerationError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
         citations = build_citations(chunks)
         result.citations = citations
         result.retrieved_context_count = len(chunks)
@@ -38,10 +48,38 @@ class ResponseService:
         started = time.perf_counter()
         chunks = retrieval_service.retrieve(request.question, request.filters, request.top_k)
         answer_parts: list[str] = []
+        events: Queue[tuple[str, str | BaseException | None]] = Queue()
 
-        for text in self.crew.stream_answer_text(request, chunks):
-            answer_parts.append(text)
-            yield self._json_line({"type": "chunk", "text": text})
+        def produce_answer() -> None:
+            try:
+                for text in self.crew.stream_answer_text(request, chunks):
+                    events.put(("chunk", text))
+            except Exception as exc:
+                events.put(("error", exc))
+            finally:
+                events.put(("done", None))
+
+        Thread(target=produce_answer, daemon=True).start()
+
+        while True:
+            try:
+                event_type, payload = events.get(timeout=10)
+            except Empty:
+                elapsed_ms = int((time.perf_counter() - started) * 1000)
+                yield self._json_line({"type": "heartbeat", "elapsed_ms": elapsed_ms})
+                continue
+
+            if event_type == "chunk":
+                text = str(payload)
+                answer_parts.append(text)
+                yield self._json_line({"type": "chunk", "text": text})
+                continue
+
+            if event_type == "error":
+                yield self._json_line({"type": "error", "detail": str(payload)})
+                return
+
+            break
 
         answer_text = "".join(answer_parts).strip()
         status, score, status_trace = self.crew.compliance_agent.check(request, chunks)

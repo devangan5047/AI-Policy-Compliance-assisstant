@@ -42,6 +42,7 @@ function App() {
   const [framework, setFramework] = useState('')
   const [answer, setAnswer] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [loadingStatus, setLoadingStatus] = useState('')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [uploadMessage, setUploadMessage] = useState('')
@@ -55,6 +56,7 @@ function App() {
   async function submitQuery(event) {
     event.preventDefault()
     setLoading(true)
+    setLoadingStatus('Preparing your policy question...')
     setError('')
     setAnswer(createStreamingAnswer(''))
     try {
@@ -75,6 +77,7 @@ function App() {
         const message = await response.text()
         throw new Error(message || 'Unable to get document guidance.')
       }
+      setLoadingStatus('Waiting for OpenRouter to finish generating...')
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
@@ -91,12 +94,20 @@ function App() {
         for (const line of lines) {
           if (!line.trim()) continue
           const event = JSON.parse(line)
+          if (event.type === 'heartbeat') {
+            const seconds = Math.max(1, Math.round((event.elapsed_ms || 0) / 1000))
+            setLoadingStatus(`Still waiting for OpenRouter... ${seconds}s`)
+          }
           if (event.type === 'chunk') {
             streamedText += event.text
             setAnswer((current) => ({ ...(current || createStreamingAnswer()), answer: streamedText }))
           }
+          if (event.type === 'error') {
+            throw new Error(event.detail || 'Unable to get document guidance.')
+          }
           if (event.type === 'final') {
             setAnswer(event.answer)
+            setLoadingStatus('')
           }
         }
       }
@@ -105,6 +116,7 @@ function App() {
       setError(err.response?.data?.detail || err.message || 'Unable to get document guidance.')
     } finally {
       setLoading(false)
+      setLoadingStatus('')
     }
   }
 
@@ -218,6 +230,16 @@ function App() {
         </form>
 
         {error && <div className="error-banner">{error}</div>}
+
+        {loading && !answer?.answer && (
+          <section className="loading-panel" aria-live="polite">
+            <div className="loading-spinner" aria-hidden="true" />
+            <div>
+              <strong>Generating answer</strong>
+              <p>{loadingStatus || 'Waiting for OpenRouter...'}</p>
+            </div>
+          </section>
+        )}
 
         {answer && (
           <section className="results-grid">

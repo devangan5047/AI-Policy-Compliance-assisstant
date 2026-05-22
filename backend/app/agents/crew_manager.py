@@ -63,19 +63,9 @@ class ComplianceCrewManager:
         )
 
     def stream_answer_text(self, request: PolicyQueryRequest, chunks: list[PolicyChunk]):
-        if not chunks:
-            fallback, _ = self._compose_fallback_answer(request, chunks)
-            yield fallback
-            return
-
         prompt = self._answer_prompt(request, chunks)
-        yielded = False
-        for text in self.llm.stream(prompt) or ():
-            yielded = True
-            yield text
-        if not yielded:
-            fallback, _ = self._compose_fallback_answer(request, chunks)
-            yield fallback
+        answer, _ = self.llm.generate(prompt)
+        yield answer
 
     def _compose_answer(
         self,
@@ -89,18 +79,13 @@ class ComplianceCrewManager:
         recommendations: list[str],
         conflicts: list[str],
     ) -> tuple[str, dict[str, int], dict | None]:
-        if not chunks:
-            answer, usage = self._compose_fallback_answer(request, chunks)
-            return answer, usage, None
-
-        context = self._format_context(chunks)
         prompt = (
             COMPLIANCE_SYSTEM_PROMPT
             + "\n\n"
             + STRUCTURED_ANSWER_PROMPT.format(
                 question=request.question,
                 employee_context=request.employee_context or "Not provided",
-                context=context or "No context retrieved",
+                context=self._format_context(chunks) or "No context retrieved",
             )
         )
         llm_text, usage = self.llm.generate(prompt)
@@ -112,51 +97,7 @@ class ComplianceCrewManager:
             conflicts.extend(parsed.get("conflicts", []))
             return parsed["answer"], usage, parsed
 
-        answer, usage = self._compose_fallback_answer(
-            request,
-            chunks,
-            interpretation,
-            status,
-            score,
-            risk_level,
-            escalation_required,
-            recommendations,
-            conflicts,
-            usage,
-        )
-        return answer, usage, None
-
-    def _compose_fallback_answer(
-        self,
-        request: PolicyQueryRequest,
-        chunks: list[PolicyChunk],
-        interpretation: str | None = None,
-        status: str = "insufficient_context",
-        score: int = 25,
-        risk_level: str = "medium",
-        escalation_required: bool = True,
-        recommendations: list[str] | None = None,
-        conflicts: list[str] | None = None,
-        usage: dict[str, int] | None = None,
-    ) -> tuple[str, dict[str, int]]:
-        usage = usage or {"prompt_tokens": 0, "completion_tokens": 0}
-        recommendations = recommendations or []
-        conflicts = conflicts or []
-        if not chunks:
-            return (
-                "I could not find document context that answers this question. Upload the relevant document or broaden the filters, then ask again.",
-                usage,
-            )
-
-        interpretation = interpretation or "The retrieved documents provide partial context for this question."
-        rec_text = " ".join(f"{index + 1}. {item}" for index, item in enumerate(recommendations))
-        conflict_text = f" Potential conflict detected: {'; '.join(conflicts)}" if conflicts else ""
-        answer = (
-            f"{interpretation} Current assessment: {status.replace('_', ' ')} with a compliance score of {score}/100. "
-            f"Risk level is {risk_level}; escalation required: {'yes' if escalation_required else 'no'}.{conflict_text} "
-            f"Recommended next steps: {rec_text}"
-        )
-        return answer, usage
+        return llm_text, usage, None
 
     def _answer_prompt(self, request: PolicyQueryRequest, chunks: list[PolicyChunk]) -> str:
         return (

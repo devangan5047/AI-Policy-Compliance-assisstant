@@ -229,6 +229,38 @@ textarea {
   text-align: left;
 }
 
+.loading-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  text-align: left;
+}
+
+.loading-panel p {
+  margin: 4px 0 0;
+  color: #475569;
+}
+
+.loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #bfdbfe;
+  border-top-color: #0f766e;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .results-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);

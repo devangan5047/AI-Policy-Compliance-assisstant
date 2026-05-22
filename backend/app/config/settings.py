@@ -16,8 +16,9 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
 
     openrouter_api_key: str | None = Field(default=None, alias="OPENROUTER_API_KEY")
-    openrouter_model: str = Field(default="openai/gpt-3.5-mini", alias="OPENROUTER_MODEL")
+    openrouter_model: str = Field(default="openrouter/auto", alias="OPENROUTER_MODEL")
     openrouter_base_url: str | None = Field(default=None, alias="OPENROUTER_BASE_URL")
+    openrouter_timeout_seconds: float | None = Field(default=None, alias="OPENROUTER_TIMEOUT_SECONDS")
 
     embedding_model: str = Field(
         default="sentence-transformers/all-MiniLM-L6-v2",
