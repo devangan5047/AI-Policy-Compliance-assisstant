@@ -1,0 +1,93 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.pyre/
+.mypy_cache/
+.dmypy.json
+.dmypy
+
+# Python environments
+venv/
+ENV/
+env/
+backend/.venv/
+
+# Environment files
+.env
+*.env
+.env.local
+.env.*.local
+
+# Backend artifacts
+backend/__pycache__/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/vector_store/
+backend/tests/uploads/
+
+# Database files
+*.sqlite3
+*.sqlite3-journal
+
+# IDE/editor files
+.idea/
+*.iml
+.vscode/
+.history/
+*.swp
+*.swo
+*~
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnpm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+/dist/
+/build/
+/public/build/
+/.vite/
+
+# Docker
+docker-compose.override.yml
+
+# OS generated files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Build artifacts
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Compiled binaries
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Secrets
+*.pem
+*.key
+*.local
